@@ -1,4 +1,3 @@
-#Multidimensional Time Series  
-John Gunasar and Spencer Lutz  
+# Multi Dimensional Time Series
 
-This is a project worked on by John Gunasar and Spencer Lutz for an independent study. 
+This is a project by John Gunasar and Spencer Lutz
