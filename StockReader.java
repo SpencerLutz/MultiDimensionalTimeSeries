@@ -1,3 +1,7 @@
+
+import java.io.File;
+import java.io.FileNotFoundException;
+import java.io.FileReader;
 import java.io.IOException;
 import java.net.MalformedURLException;
 import java.net.URL;
@@ -5,72 +9,66 @@ import java.net.URLConnection;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+import java.util.Dictionary;
+import java.util.Hashtable;
 import java.util.Scanner;
 
+import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 
 public class StockReader {
-		private static String stockName;
-		private static URL apiURL;
-		private static String jsonString = "";
-		private static ArrayList<Double> prices = new ArrayList<Double>();
-	 
-		public StockReader(String stockName) {
-			this.stockName = stockName;
+	
+		public static String getURLString(String stockName) {
+			return "https://www.alphavantage.co/query?function=TIME_SERIES_DAILY&symbol=" + stockName + "&interval=5min&outputsize=compact&apikey=3NW99LS85309Q6FH";
 		}
 		
-		private static void setAPILink() throws MalformedURLException {
-			apiURL = new URL("https://www.alphavantage.co/query?function=TIME_SERIES_DAILY&symbol=" + StockReader.stockName + "&interval=5min&outputsize=compact&apikey=3NW99LS85309Q6FH");
+		public static URL getAPIUrl(String stockName) throws MalformedURLException {
+			return new URL(getURLString(stockName));
 		}
 		
-		private static void setJsonString() throws IOException {
-			StockReader.setAPILink();
+		public static String getJsonString(String stockName) throws IOException {
+			String jsonString = "";
+			URL apiURL = getAPIUrl(stockName);
 			URLConnection conn = apiURL.openConnection();
 			Scanner apiCallScanner = new Scanner(apiURL.openStream());
 			while(apiCallScanner.hasNext()) {
 				jsonString += apiCallScanner.nextLine();
 			}
+			return jsonString;
 		}
-		
-		private static double getPrice(String date) throws JSONException, IOException {
-			StockReader.setJsonString();
-			JSONObject prices = new JSONObject(jsonString);
-			return prices.getJSONObject("Time Series (Daily)").getJSONObject(date).getDouble("4. close");
-		}
-		
-		private static boolean jsonObjectExists(String date) throws IOException, JSONException {
-			StockReader.setJsonString();
-			JSONObject currentObject = new JSONObject(jsonString);
-			return !currentObject.getJSONObject("Time Series (Daily)").isNull(date);
-		}
-		
-		public static void setPricesForLast(int n) throws JSONException, IOException {
-			for(int i = 0;i<n;i++) {
-				String date = LocalDate.now().plusDays(-i-1).format(DateTimeFormatter.ofPattern("yyyy-MM-dd"));
-				if(StockReader.jsonObjectExists(date)) {
-					prices.add(StockReader.getPrice(date));
-				}
-			}					
-		}
-		
-		public static String getURL() {
-			return StockReader.apiURL.toString();
-		}
-		
-		public static String getJsonString() {
-			return StockReader.jsonString;
-		}
-		
-		public static ArrayList<Double> getPrices() {
-			return StockReader.prices;
-		}
-		public static void main(String[] args) throws JSONException, IOException {
-			StockReader AppleStockReader = new StockReader("AAPL");
-			AppleStockReader.setPricesForLast(150);
-			ArrayList<Double> prices = AppleStockReader.getPrices();
-			for(int i = 0;i<prices.size();i++) {
-				System.out.println(prices.get(i));
+					
+		public static String[] getAvailableDates(String stockName) throws IOException {
+			String jsonString = getJsonString(stockName);
+			JSONObject apiCallResult = new JSONObject(jsonString);
+			JSONObject timeSeriesDaily = apiCallResult.getJSONObject("Time Series (Daily)");
+			JSONArray dates = timeSeriesDaily.names();
+			String[] result = new String[dates.length()];
+			for(int i = 0;i<dates.length();i++) {
+				result[i] = dates.getString(i);
 			}
+			return result;
 		}
-	}
+		
+		public static double[][] getPrices(String stockName) throws IOException {
+			String jsonString = getJsonString(stockName);
+			JSONObject timeSeriesDaily = new JSONObject(jsonString);
+			String[] dates = getAvailableDates(stockName);
+			double[][] prices = new double[dates.length][1];
+			for(int i = 0;i<prices.length;i++) {
+				prices[i][0] = timeSeriesDaily.getJSONObject("Time Series (Daily)").getJSONObject(dates[i]).getDouble("4. close");
+			}
+			return prices;
+		}
+		
+		public static double getMaxPrice(String stockName) throws IOException {
+			double[][] prices = getPrices(stockName);
+			double max = prices[0][0];
+			for(int i = 0;i<prices.length;i++) {
+				if(prices[i][0] > max) {
+					max = prices[i][0];
+				}
+			}
+			return max;
+		}
+}
