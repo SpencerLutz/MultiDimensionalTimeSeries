@@ -1,61 +1,46 @@
+
+
 import java.io.IOException;
+import java.time.LocalDate;
 import java.util.ArrayList;
 
 import org.json.JSONException;
 
 public class Stock {
-	public static String stockName;
-	public static double[][] actualPrices;
-	public static double[] predictedPrices;
 	
-	public static final int LAST_N = 150;
-	public static final int NUMBER_OF_PARAMETERS = 300;
+	public static int params = 10;
 	
-	public Stock(String stockName) {
-		this.stockName = stockName;
+	private static double[][] getLastPricesFor(String stockName) throws IOException {
+		return StockReader.getPrices(stockName);
 	}
 	
-	private static void setPrices() throws JSONException, IOException {
-		StockReader stockReader = new StockReader(Stock.stockName);
-		stockReader.setPricesForLast(LAST_N);
-		ArrayList<Double> prices = stockReader.getPrices();
-		Stock.actualPrices = new double[prices.size()][1];
-		for(int i = 0;i<stockReader.getPrices().size();i++) {
-			Stock.actualPrices[i][0] = prices.get(i);
+	public static double[] getNextPrices(int n, String stockName) throws IOException {
+		double[][] lastPrices = getLastPricesFor(stockName);
+		double[] result = new double[n];
+		HypothesisFunction StockFunction = new HypothesisFunction(lastPrices,params);
+		StockFunction.setParameterVector();
+		StockFunction.setAlternateTimeSeries(StockFunction.inputMatrix.length + n);
+		for(int i = 100;i<100+n;i++) {
+			result[i-100] = StockFunction.HoX(i);
 		}
+		return result;
 	}
-	
-	public static void setPredictedPrices() throws IOException, JSONException {
-		Stock.setPrices();
-		HypothesisFunction currentTimeSeries = new HypothesisFunction(Stock.actualPrices,NUMBER_OF_PARAMETERS);
-		currentTimeSeries.setPredictedData();
-		Stock.predictedPrices = currentTimeSeries.getPredictedData();
-	}
-	
-	public static double getAverageError() {
-		double sum = 0;
-		for(int i = 0;i<predictedPrices.length;i++) {
-			sum+= Math.abs(Stock.actualPrices[i][0] - Stock.predictedPrices[i]);
+	public static double getMaxPrice(int n,String stockName) throws IOException {
+		double[] prices = getNextPrices(n,stockName);
+		double max = prices[0];
+		for(int i = 0;i<prices.length;i++) {
+			if(prices[i] > max) {
+				max = prices[i];
+			}
 		}
-		return sum/predictedPrices.length;
-	}
-
-	public static String getStockName() {
-		return Stock.stockName;
+		return max;
 	}
 	
-	public static double[][] getActualPrices() {
-		return Stock.actualPrices;
-	}
-	
-	public static double[] getPredictedPrices() {
-		return Stock.predictedPrices;
-	}
-	
-	public static void main(String[] args) throws JSONException, IOException  {
-		Stock Apple = new Stock("AAPL");
-		Apple.setPredictedPrices();
-		System.out.print(Apple.getAverageError());
+	public static void main(String[] args) throws IOException {
+		double[] AAPL_PRICES = Stock.getNextPrices(100,"AAPL");
+		for(int i = 0;i<AAPL_PRICES.length;i++) {
+			System.out.println(AAPL_PRICES[i]);
+		}
 	}
 }
  
