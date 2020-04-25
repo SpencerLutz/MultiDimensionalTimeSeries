@@ -7,7 +7,7 @@ import java.util.Stack;
 
 import org.ejml.simple.SimpleMatrix;
 
-public class HypothesisFunction {
+public class CosineHypothesisFunction {
 	
 	private double[][] designMatrix;
 	public double[] predictedData;
@@ -15,12 +15,10 @@ public class HypothesisFunction {
 	public double[][] inputMatrix;
 	private static SimpleMatrix parameterVector;
 	private static int numberOfParameters;
-	private static double stepSize;
 	
 	public HypothesisFunction(double[][] outputMatrix,int numberOfParameters) {
 		this.outputMatrix = outputMatrix;
 		this.numberOfParameters = numberOfParameters;
-		this.stepSize = 1; // I added this for step size
 	}
 	
 	private void setTimeSeries() {
@@ -65,8 +63,79 @@ public class HypothesisFunction {
 		}
 		addOneToBeginning();
 	}
+	
+	protected void setParameterVector() throws IOException {
+		setTimeSeries();
+		setDesignMatrix();
+		SimpleMatrix x = new SimpleMatrix(designMatrix);
+		SimpleMatrix y = new SimpleMatrix(outputMatrix);
+		parameterVector = x.transpose().mult(x).pseudoInverse().mult(x.transpose()).mult(y);
+	}
+	
+	public double HoX(double x) throws IOException {
+		double currentSum = parameterVector.get(0);
+		for (int k = 1; k < numberOfParameters; k++) {
+			currentSum += parameterVector.get(k) * Math.cos(k * x);
+		}
+		return currentSum;
+	}
+	
+	public void setPredicted() throws IOException {
+		predictedData = new double[inputMatrix.length];
+		for (int i = 0; i < inputMatrix.length; i++) {
+			predictedData[i] = HoX(inputMatrix[i][0]);
+		}
+	}
+			
+	public double[] getPredicted() throws IOException {
+		setPredicted();
+		return predictedData;
+	}
+				
+	private void addOneToBeginning() {
+		double[][] result = new double[designMatrix.length][designMatrix[0].length+1];
+		for (int i = 0; i < result.length; i++) {
+			for (int j = 1; j < result[i].length; j++) {
+				result[i][j] = designMatrix[i][j-1];
+			}
+			result[i][0] = 1;
+		}
+		designMatrix = result;
+	}
+}
 
-	private void setPolyDesignMatrix() { // For polynomials
+public class PolynomialHypothesisFunction {
+	
+	private double[][] designMatrix;
+	public double[] predictedData;
+	private double[][] outputMatrix;
+	public double[][] inputMatrix;
+	private static SimpleMatrix parameterVector;
+	private static int numberOfParameters;
+	private static double stepSize;
+	
+	public HypothesisFunction(double[][] outputMatrix,int numberOfParameters) {
+		this.outputMatrix = outputMatrix;
+		this.numberOfParameters = numberOfParameters;
+		this.stepSize = 1; // I added this for step size
+	}
+	
+	private void setTimeSeries() {
+		inputMatrix = new double[outputMatrix.length][1];
+		for (int i = 0; i < outputMatrix.length; i++) {
+			inputMatrix[i][0] = i+1;
+		}
+	}
+	
+	protected void setAlternateTimeSeries(int n) {
+		double[][] alternateTimeSeries = new double[n][1];
+		for (int i = 0; i < alternateTimeSeries.length; i++) {
+			alternateTimeSeries[i][0] = i+1;
+		}
+		inputMatrix = alternateTimeSeries;
+	}
+
+	private void setDesignMatrix() { // For polynomials
 		setTimeSeries();
 		int numberOfRows = inputMatrix.length;
 		int numberOfColumns = (numberOfParameters * inputMatrix[0].length);
@@ -101,16 +170,8 @@ public class HypothesisFunction {
 		SimpleMatrix y = new SimpleMatrix(outputMatrix);
 		parameterVector = x.transpose().mult(x).pseudoInverse().mult(x.transpose()).mult(y);
 	}
-	
-	public double HoX(double x) throws IOException {
-		double currentSum = parameterVector.get(0);
-		for (int k = 1; k < numberOfParameters; k++) {
-			currentSum += parameterVector.get(k) * Math.cos(k * x);
-		}
-		return currentSum;
-	}
 
-	public double HoXPoly(double x) throws IOException { // For Polynomials
+	public double HoX(double x) throws IOException { // For Polynomials
 		double currentSum = parameterVector.get(0);
 		for (int k = 1; k < numberOfParameters; k++) {
 			currentSum += parameterVector.get(k) * Math.cos(x, k * stepSize);
@@ -141,3 +202,4 @@ public class HypothesisFunction {
 		designMatrix = result;
 	}
 }
+
