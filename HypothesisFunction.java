@@ -135,7 +135,7 @@ public class PolynomialHypothesisFunction {
 		inputMatrix = alternateTimeSeries;
 	}
 
-	private void setDesignMatrix() { // For polynomials
+	private void setDesignMatrix() {
 		setTimeSeries();
 		int numberOfRows = inputMatrix.length;
 		int numberOfColumns = (numberOfParameters * inputMatrix[0].length);
