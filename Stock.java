@@ -8,11 +8,11 @@ public class Stock {
 	
 	public static int params = 10;
 	
-	private static double[][] getLastPricesFor(String stockName) throws IOException {
+	public static double[][] getLastPricesFor(String stockName) throws IOException, JSONException {
 		return StockReader.getPrices(stockName);
 	}
 	
-	public static double[] getNextPrices(int n, String stockName) throws IOException {
+	public static double[] getNextPrices(int n, String stockName) throws IOException, JSONException {
 		double[][] lastPrices = getLastPricesFor(stockName);
 		double[] result = new double[n];
 		HypothesisFunction StockFunction = new HypothesisFunction(lastPrices,params);
@@ -23,7 +23,8 @@ public class Stock {
 		}
 		return result;
 	}
-	public static double getMaxPrice(int n,String stockName) throws IOException {
+	
+	public static double getMaxPrice(int n,String stockName) throws IOException, JSONException {
 		double[] prices = getNextPrices(n,stockName);
 		double max = prices[0];
 		for(int i = 0;i<prices.length;i++) {
@@ -33,11 +34,8 @@ public class Stock {
 		}
 		return max;
 	}
-	
-	public static void main(String[] args) throws IOException {
-		double[] AAPL_PRICES = Stock.getNextPrices(100,"AAPL");
-		for(int i = 0;i<AAPL_PRICES.length;i++) {
-			System.out.println(AAPL_PRICES[i]);
-		}
-	}
 }
+ 
+
+ 
+ 

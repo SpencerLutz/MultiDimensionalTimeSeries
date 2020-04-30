@@ -1,5 +1,7 @@
 
 
+
+
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.FileReader;
@@ -20,8 +22,8 @@ import org.json.JSONObject;
 
 public class StockReader {
 	
-		public static String getURLString(String stockName) {
-			return "https://www.alphavantage.co/query?function=TIME_SERIES_DAILY&symbol=" + stockName + "&interval=5min&outputsize=compact&apikey=3NW99LS85309Q6FH";
+		public static String getURLString(String symbol) {
+			return "https://sandbox.iexapis.com/stable/stock/" + symbol + "/batch?types=quote,news,chart&range=1m&last=10&token=Tsk_db4493dc79614614a66ce7b5b62201d2";
 		}
 		
 		public static URL getAPIUrl(String stockName) throws MalformedURLException {
@@ -38,33 +40,27 @@ public class StockReader {
 			}
 			return jsonString;
 		}
-					
-		public static String[] getAvailableDates(String stockName) throws IOException {
-			String jsonString = getJsonString(stockName);
-			JSONObject apiCallResult = new JSONObject(jsonString);
-			JSONObject timeSeriesDaily = apiCallResult.getJSONObject("Time Series (Daily)");
-			JSONArray dates = timeSeriesDaily.names();
-			String[] result = new String[dates.length()];
-			for(int i = 0;i<dates.length();i++) {
-				result[i] = dates.getString(i);
-			}
-			return result;
-		}
 		
-		public static double[][] getPrices(String stockName) throws IOException {
+		public static JSONArray getJSONArray(String stockName) throws IOException, JSONException {
 			String jsonString = getJsonString(stockName);
-			JSONObject timeSeriesDaily = new JSONObject(jsonString);
-			String[] dates = getAvailableDates(stockName);
-			double[][] prices = new double[dates.length][1];
-			for(int i = 0;i<prices.length;i++) {
-				prices[i][0] = timeSeriesDaily.getJSONObject("Time Series (Daily)").getJSONObject(dates[i]).getDouble("4. close");
+			JSONObject jsonObject = new JSONObject(jsonString);
+			JSONArray chart = jsonObject.getJSONArray("chart");
+			return chart;
+		}
+							
+	public static double[][] getPrices(String stockName) throws IOException, JSONException {
+		String jsonString = getJsonString(stockName);
+			JSONArray chart = getJSONArray(stockName);
+			double[][] prices = new double[chart.length()][1];
+			for(int i = 0;i<chart.length();i++) {
+				JSONObject currentObject = chart.getJSONObject(i);
+				prices[i][0] = currentObject.getDouble("close");
 			}
 			return prices;
-		}
-		
-		public static double getMaxPrice(String stockName) throws IOException {
+		}	
+	public static double getMaxPrice(String stockName) throws IOException, JSONException {
 			double[][] prices = getPrices(stockName);
-			double max = prices[0][0];
+		double max = prices[0][0];
 			for(int i = 0;i<prices.length;i++) {
 				if(prices[i][0] > max) {
 					max = prices[i][0];
@@ -72,4 +68,22 @@ public class StockReader {
 			}
 			return max;
 		}
+		
+	public static String getCompanyName(String symbol) throws IOException, JSONException {
+		String jsonString = getJsonString(symbol);
+		JSONObject jsonObject = new JSONObject(jsonString);
+		return jsonObject.getJSONObject("quote").getString("companyName");
+	}
+	
+	public static boolean isValidSymbol(String symbol) {
+		boolean symbolExists = true;
+		try {
+			getJsonString(symbol);
+		} catch (IOException e1) {
+			symbolExists = false;
+		}
+		return symbolExists;
+	}
 }
+
+
