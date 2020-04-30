@@ -10,6 +10,9 @@ import java.text.DecimalFormat;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Scanner;
+import java.util.Timer;
+
+import org.json.JSONException;
 
 import javafx.application.Application;
 import javafx.geometry.Pos;
@@ -61,18 +64,192 @@ public class Main extends Application  {
 	StockPortfolio StockPortfolio = new StockPortfolio();
 	String chartTitle = "";
 	
+	NumberAxis xAxis2 = null;
+	NumberAxis yAxis2 = null;
+	XYChart.Series series12 = null;
+	XYChart.Series series22 = null;
+	ScatterChart<Number,Number> sc2 = null;
+	Label quotasLabel2 = null;
+	StockPortfolio StockPortfolio2 = new StockPortfolio();
+	String chartTitle2 = "";
+	
 	@Override
 	public void start(Stage primaryStage) throws Exception {
 		
+		Scanner symbolsFileScanner;
+		try {
+			symbolsFileScanner = new Scanner(new File("bin/symbols.txt"));
+			while(symbolsFileScanner.hasNext()) {
+				StockPortfolio.symbols.add(symbolsFileScanner.next());
+			}
+			symbolsFileScanner.close();
+		} catch (FileNotFoundException e) {
+			e.printStackTrace();
+		}
+		
+		VBox quotas = new VBox();
+		quotas.setSpacing(10);
+		quotas.setLayoutX(W*0.275);
+		quotas.setLayoutY(H*0.46);
+				
+		quotasLabel = new Label("Predicted Prices");
+		quotasLabel.setFont(Font.font("Georgia",FontWeight.BOLD,25));
+		quotasLabel.setTextFill(TEXT_COLOR);
+		quotas.getChildren().add(quotasLabel);
+		
+		series1 = new XYChart.Series();
+		xAxis = new NumberAxis();
+		yAxis = new NumberAxis();
+		xAxis.setAutoRanging(true);
+		yAxis.setAutoRanging(true);
+		xAxis.setLabel("Days since " + LocalDate.now().minusDays(21).toString());
+		yAxis.setLabel("Price");
+		sc = new ScatterChart<Number, Number>(xAxis, yAxis);
+		sc.setLayoutX(W*0.26);
+		sc.setLayoutY(H*0.13);
+		sc.setPrefWidth(W*0.36);
+	
+		Image emptyImage = new Image("emptyIcon.png");
+		ImageView emptyImageView = new ImageView(emptyImage);
+		emptyImageView.setLayoutX(W*0.23);
+				
 		Group homeGroup = new Group();
 		Group epg = new Group();
 		Group helpGroup = new Group();
 		Group infoGroup = new Group();
+		Group quickAnalyzeGroup = new Group();
 		
 		Scene homeScene = new Scene(homeGroup);
 		Scene epScene = new Scene(epg);
 		Scene helpScene = new Scene(helpGroup);
 		Scene infoScene = new Scene(infoGroup);
+		Scene quickAnalyzeScene = new Scene(quickAnalyzeGroup);
+		
+		quickAnalyzeScene.setFill(BACKGROUND_COLOR);
+		
+		series12 = new XYChart.Series();
+		xAxis2 = new NumberAxis();
+		yAxis2 = new NumberAxis();
+		yAxis2.setLabel("Price");
+		xAxis2.setLabel("Days since " + LocalDate.now().minusDays(21).toString());
+		xAxis2.setAutoRanging(true);
+		yAxis2.setAutoRanging(true);
+		sc2 = new ScatterChart<Number,Number>(xAxis2,yAxis2);
+		sc2.setLayoutX(W*0.14);
+		sc2.setLayoutY(H*0.12);
+		sc2.setPrefWidth(W*0.36);
+		
+		VBox quotas2 = new VBox();
+		quotas2.setSpacing(10);
+		quotas2.setLayoutX(W*0.18);
+		quotas2.setLayoutY(H*0.46);
+				
+		quotasLabel2 = new Label("Predicted Prices");
+		quotasLabel2.setFont(Font.font("Georgia",FontWeight.BOLD,25));
+		quotasLabel2.setTextFill(TEXT_COLOR);
+		quotas2.getChildren().add(quotasLabel2);
+		quotas2.setVisible(false);
+		
+		TextField symbolTextField = new TextField("Symbol");
+		symbolTextField.setLayoutX(W*0.16);
+		symbolTextField.setLayoutY(H*0.08);
+		symbolTextField.setPrefWidth(W*0.1);
+		symbolTextField.setPrefHeight(H*0.03);
+		symbolTextField.setFont(Font.font("Georgia",20));
+		
+		Button GetForecast = new Button("Get Forecast");
+		GetForecast.setLayoutX(W*0.275);
+		GetForecast.setLayoutY(H*0.08);
+		GetForecast.setPrefWidth(W*0.1);
+		GetForecast.setPrefHeight(H*0.03);
+		GetForecast.setStyle("-fx-background-color:rgb(0,168,204);");
+		GetForecast.setTextFill(TEXT_COLOR);
+		GetForecast.setFont(Font.font("Georgia",20));
+		
+		GetForecast.setOnMouseEntered(e-> {
+			GetForecast.setStyle("-fx-background-color: rgb(0,140,204);");
+		});
+		
+		GetForecast.setOnMouseExited(e-> {
+			GetForecast.setStyle("-fx-background-color: rgb(0,168,204);");
+		});
+		
+		GetForecast.setOnAction(e-> {
+			quotas2.setVisible(false);
+			series12.getData().clear();
+			sc2.getData().clear();
+			quotas2.getChildren().clear();
+			quotasLabel2 = new Label("Predicted Prices");
+			quotasLabel2.setFont(Font.font("Georgia",FontWeight.BOLD,25));
+			quotasLabel2.setTextFill(TEXT_COLOR);
+			quotas2.getChildren().add(quotasLabel2);
+			
+			Alert alert = new Alert(AlertType.ERROR);
+			alert.initModality(Modality.APPLICATION_MODAL);
+			alert.initOwner(primaryStage);
+			alert.setTitle("Error");
+			alert.setHeaderText("Error in finding symbol");
+			alert.setContentText("The symbol " + symbolTextField.getText() + " does not exist");
+			if(StockReader.isValidSymbol(symbolTextField.getText()) == false) {
+				alert.showAndWait();
+			} else {
+				try {
+					double[][] lastPrices = Stock.getLastPricesFor(symbolTextField.getText());
+					double[] nextPrices = Stock.getNextPrices(5, symbolTextField.getText());
+					for(int i = 0;i<lastPrices.length;i++) {
+						double price = lastPrices[i][0];
+						price = Double.parseDouble(new DecimalFormat("##.##").format(price));
+						series12.getData().add(new XYChart.Data(i+1,price));
+					}
+					for(int i = 0;i<nextPrices.length;i++) {
+						double price = lastPrices[i][0];
+						price = Double.parseDouble(new DecimalFormat("##.##").format(price));
+						String labelString = LocalDate.now().plusDays(i+1).toString() + " : " + Double.toString(price);
+						Label currentLabel = new Label(labelString);
+						currentLabel.setFont(Font.font("Georgia",20));
+						currentLabel.setTextFill(TEXT_COLOR);
+						quotas2.getChildren().add(currentLabel);
+					}
+				} catch (IOException | JSONException e1) {
+					e1.printStackTrace();
+				}
+				String currentStock = symbolTextField.getText();
+				String currentChartTitle = "";
+				try {
+					currentChartTitle = currentStock + "(" + StockReader.getCompanyName(currentStock) + ")" + " Previous Prices";
+				} catch (IOException | JSONException e1) {
+					e1.printStackTrace();
+				}
+				quotas2.setVisible(true);
+				sc2.setTitle(currentChartTitle);
+				sc2.getData().add(series12);
+			}
+		});
+		
+		Button homeButton4 = new Button("Home");
+		homeButton4.setLayoutX(W*0.01);
+		homeButton4.setLayoutY(H*0.01);
+		homeButton4.setPrefWidth(W*0.078);
+		homeButton4.setFont(Font.font("Georgia",FontWeight.BOLD,15));
+		homeButton4.setStyle("-fx-background-color: rgb(0,168,204);");
+		homeButton4.setTextFill(TEXT_COLOR);
+		
+		homeButton4.setOnMouseEntered(e-> {
+			homeButton4.setStyle("-fx-background-color: rgb(0,140,204);");
+		});
+		
+		homeButton4.setOnMouseExited(e-> {
+			homeButton4.setStyle("-fx-background-color: rgb(0,168,204);");
+		});
+		
+		homeButton4.setOnAction(e-> {
+			primaryStage.setScene(homeScene);
+			primaryStage.setFullScreen(true);
+		});
+		
+		quickAnalyzeGroup.getChildren().addAll(sc2,homeButton4,symbolTextField,GetForecast,quotas2);
+		
+		homeGroup.getChildren().add(sc);
 		
 		infoScene.setFill(BACKGROUND_COLOR);
 		
@@ -281,21 +458,52 @@ public class Main extends Application  {
 	            BorderStrokeStyle.SOLID, CornerRadii.EMPTY, BorderWidths.DEFAULT)));
 		
 		add.setOnAction(e-> {
-			try {
-				StockPortfolio.addStock(symbol.getText());
-			} catch (IOException e1) {
-				e1.printStackTrace();
-			}
+			Alert alert = new Alert(AlertType.ERROR);
+			alert.initModality(Modality.APPLICATION_MODAL);
+			alert.initOwner(primaryStage);
+			alert.setTitle("Error");
+			alert.setHeaderText("Error in finding symbol");
+			alert.setContentText("The symbol " + symbol.getText() + " does not exist");
 			
-			Label currentLabel = new Label(symbol.getText());
-			currentLabel.setFont(Font.font("Georgia",FontWeight.BOLD,40));
-			currentLabel.setTextFill(TEXT_COLOR);
-			if(StockPortfolio.symbols.size()<10) {
-				symbolsVBox.getChildren().add(currentLabel);
+			Alert alert2 = new Alert(AlertType.ERROR);
+			alert2.initModality(Modality.APPLICATION_MODAL);
+			alert2.initOwner(primaryStage);
+			alert.setTitle("Error");
+			alert2.setHeaderText("Error in adding symbol");
+			alert2.setContentText("The symbol " + symbol.getText() + " is already in your portfolio");
+		
+			if(StockReader.isValidSymbol(symbol.getText()) == false) {
+				alert.showAndWait();
+			} if(StockPortfolio.isInPortfolio(symbol.getText())==true) {
+				alert2.showAndWait();
 			} else {
-				symbolsVBoxTwo.getChildren().add(currentLabel);
+				try {
+					StockPortfolio.addStock(symbol.getText());
+				} catch (IOException e1) {
+					e1.printStackTrace();
+				} catch (JSONException e1) {
+					e1.printStackTrace();
+				}
+				
+				if(StockPortfolio.symbols.size()>0) {
+					none.setVisible(false);
+				}
+				
+				String labelString = "";
+				try {
+					labelString = symbol.getText() + "(" + StockReader.getCompanyName(symbol.getText()) + ")";
+				} catch (IOException | JSONException e1) {
+					e1.printStackTrace();
+				}
+				Label currentLabel = new Label(labelString);
+				currentLabel.setFont(Font.font("Georgia",FontWeight.BOLD,40));
+				currentLabel.setTextFill(TEXT_COLOR);
+				if(StockPortfolio.symbols.size()<10) {
+					symbolsVBox.getChildren().add(currentLabel);
+				} else {
+					symbolsVBoxTwo.getChildren().add(currentLabel);
+				}
 			}
-			none.setText("");
 		});
 		
 		add.setOnMouseEntered(e-> {
@@ -318,18 +526,47 @@ public class Main extends Application  {
 	            BorderStrokeStyle.SOLID, CornerRadii.EMPTY, BorderWidths.DEFAULT)));
 		
 		remove.setOnAction(e-> {
-			StockPortfolio.removeStock(symbol.getText());
-			symbolsVBox.getChildren().clear();
-			symbolsVBoxTwo.getChildren().clear();
-			
-			for(int i = 0;i<StockPortfolio.symbols.size();i++) {
-				Label currentLabel = new Label(StockPortfolio.symbols.get(i));
-				currentLabel.setFont(Font.font("Georgia",FontWeight.BOLD,40));
-				currentLabel.setTextFill(TEXT_COLOR);
-				if(i<10) {
-					symbolsVBox.getChildren().add(currentLabel);
-				} else {
-					symbolsVBoxTwo.getChildren().add(currentLabel);
+			Alert alert = new Alert(AlertType.ERROR);
+			alert.initModality(Modality.APPLICATION_MODAL);
+			alert.initOwner(primaryStage);
+			alert.setTitle("Error");
+			alert.setHeaderText("Error in finding symbol to remove");
+			alert.setContentText("The symbol " + symbol.getText() + " does not exist in your portfolio");
+			if(StockPortfolio.isInPortfolio(symbol.getText())==false) {
+				alert.showAndWait();
+			} else {
+				StockPortfolio.removeStock(symbol.getText());
+				symbolsVBox.getChildren().clear();
+				symbolsVBoxTwo.getChildren().clear();
+				File prevFile = new File("bin/symbols/" + symbol.getText() + "prev.txt");
+				File nextFile = new File("bin/symbols/" + symbol.getText() + ".txt");
+				prevFile.delete();
+				nextFile.delete();
+				
+				if(StockPortfolio.symbols.size()==0) {
+					none.setVisible(true);
+				} 
+						
+				for(int i = 0;i<StockPortfolio.symbols.size();i++) {
+					String currentStock = StockPortfolio.symbols.get(i);
+					String label = "";
+					try {
+						label = currentStock + "(" + StockReader.getCompanyName(currentStock) + ")";
+					} catch(IOException e1) {
+						e1.printStackTrace();
+					} catch (JSONException e1) {
+						// TODO Auto-generated catch block
+						e1.printStackTrace();
+					}
+					
+					Label currentLabel = new Label(label);
+					currentLabel.setFont(Font.font("Georgia",FontWeight.BOLD,40));
+					currentLabel.setTextFill(TEXT_COLOR);
+					if(i<10) {
+						symbolsVBox.getChildren().add(currentLabel);
+					} else {
+						symbolsVBoxTwo.getChildren().add(currentLabel);
+					}
 				}
 			}
 		});
@@ -342,8 +579,6 @@ public class Main extends Application  {
 			remove.setStyle("-fx-background-color: rgb(0,80,130);");
 		});
 		
-		//Image home = new Image("home.png");
-		//ImageView homeView = new ImageView(home);
 		Button homeButton = new Button("Home");
 		homeButton.setLayoutX(W*0.01);
 		homeButton.setLayoutY(H*0.01);
@@ -352,58 +587,6 @@ public class Main extends Application  {
 		homeButton.setStyle("-fx-background-color: rgb(0,168,204);");
 		homeButton.setTextFill(TEXT_COLOR);
 		
-		homeButton.setOnAction(e-> {
-			primaryStage.setScene(homeScene);
-			primaryStage.setFullScreen(true);
-			if(StockPortfolio.symbols.size() > 0) {
-				String currentStock = StockPortfolio.symbols.get(currentIndex);
-				try {
-					String companyName = StockReader.getCompanyName(currentStock);
-					chartTitle = currentStock + "(" + companyName + ")";
-				} catch (IOException e2) {
-					e2.printStackTrace();
-				}
-				
-				double maxPrice = 1.0;
-				double tickInterval = 1.0;
-				try {
-					maxPrice = Stock.getMaxPrice(6, currentStock);
-					tickInterval = (int) maxPrice/35;
-				} catch (IOException e2) {
-					e2.printStackTrace();
-				}
-				
-				xAxis = new NumberAxis(0, 35, 1);
-				yAxis = new NumberAxis(0, maxPrice * 1.2 , tickInterval);        
-		        final ScatterChart<Number,Number> sc = new
-					ScatterChart<Number,Number>(xAxis,yAxis);
-		        xAxis.setLabel("Days since " + LocalDate.now().toString());                
-		        yAxis.setLabel("Price");
-		        sc.setTitle(currentStock + " Prices");
-		        XYChart.Series series1 = new XYChart.Series();
-		        
-		        File prevfile = new File("bin/symbols/" + currentStock + "prev.txt");
-		        Scanner prevFileScanner = null;
-				try {
-					prevFileScanner = new Scanner(prevfile);
-				} catch (FileNotFoundException e1) {
-					e1.printStackTrace();
-				}
-		        int i = 1;
-		        while(prevFileScanner.hasNextLine()) {
-		        	double price = Double.parseDouble(prevFileScanner.nextLine());
-		        	series1.getData().add(new XYChart.Data(i, price));
-		        	i++;
-		        }
-		
-		       sc.setLayoutX(W*0.231);
-		       sc.setLayoutY(H*0.1);
-		       sc.setPrefWidth(W*0.4);
-		       sc.setPrefHeight(H*0.4);
-		       sc.setTitle(chartTitle);
-		       sc.getData().add(series1);
-			}
-		});
 		homeButton.setOnMouseEntered(e-> {
 			homeButton.setStyle("-fx-background-color: rgb(0,140,204);");
 		});
@@ -411,6 +594,8 @@ public class Main extends Application  {
 		homeButton.setOnMouseExited(e-> {
 			homeButton.setStyle("-fx-background-color: rgb(0,168,204);");
 		});
+		
+		Label noStocksInPortfolio = new Label("");
 		
 		epg.getChildren().addAll(homeButton,none,symbol,add,remove,symbolsVBox,symbolsVBoxTwo,titleLabel);
 		
@@ -420,8 +605,8 @@ public class Main extends Application  {
 		
 		Image logo = new Image("logo.png");
 		ImageView logoImageView = new ImageView(logo);
-		logoImageView.setLayoutX(W*-0.0275);
-		logoImageView.setLayoutY(H*0.001);
+		logoImageView.setLayoutX(W*0.01);
+		logoImageView.setLayoutY(H*-0.01);
 		
 		Button epb = new Button("Edit Portfolio");
 		epb.setLayoutX(menuRectangle.getWidth()/4);
@@ -437,12 +622,25 @@ public class Main extends Application  {
 			
 			symbolsVBox.getChildren().clear();
 			symbolsVBoxTwo.getChildren().clear();
-			
-			primaryStage.setScene(epScene);
-			primaryStage.setFullScreen(true);
+					
+			if(StockPortfolio.symbols.size() > 0) {
+				none.setVisible(false);
+			} else {
+				none.setVisible(true);
+			}
 			
 			for(int i = 0;i<StockPortfolio.symbols.size();i++) {
-				Label currentLabel = new Label(StockPortfolio.symbols.get(i));
+				String currentStock = StockPortfolio.symbols.get(i);
+				String label = "";
+				try {
+					label = currentStock + "(" + StockReader.getCompanyName(currentStock) + ")";
+				} catch (IOException e1) {
+					e1.printStackTrace();
+				} catch (JSONException e1) {
+					// TODO Auto-generated catch block
+					e1.printStackTrace();
+				}
+				Label currentLabel = new Label(label);
 				currentLabel.setFont(Font.font("Georgia",FontWeight.BOLD,40));
 				currentLabel.setTextFill(TEXT_COLOR);
 				if(i<10) {
@@ -451,7 +649,8 @@ public class Main extends Application  {
 					symbolsVBoxTwo.getChildren().add(currentLabel);
 				}
 			}
-			
+			primaryStage.setScene(epScene);
+			primaryStage.setFullScreen(true);
 		});
 	
 		epb.setOnMouseEntered(e-> {
@@ -507,91 +706,30 @@ public class Main extends Application  {
 			primaryStage.setScene(infoScene);
 			primaryStage.setFullScreen(true);
 		});
+				
+		Button quickAnalyzeButton = new Button("Quick Analyze");
+		quickAnalyzeButton.setLayoutX(menuRectangle.getWidth()/4);
+		quickAnalyzeButton.setLayoutY(H*0.6);
+		quickAnalyzeButton.setPrefWidth(menuRectangle.getWidth()/2);
+		quickAnalyzeButton.setPrefHeight(H*0.05);
+		quickAnalyzeButton.setStyle("-fx-background-color: rgb(0,168,204);");
+		quickAnalyzeButton.setFont(Font.font("Georgia",25));
+		quickAnalyzeButton.setBorder(new Border(new BorderStroke(Color.BLACK, 
+	            BorderStrokeStyle.SOLID, CornerRadii.EMPTY, BorderWidths.DEFAULT)));
 		
-		if(StockPortfolio.symbols.size() > 0) {
-			String currentStock = StockPortfolio.symbols.get(currentIndex);
-			String companyName = StockReader.getCompanyName(currentStock);
-			chartTitle = currentStock + "(" + companyName + ")";
-			maxPrice = Stock.getMaxPrice(6, currentStock);
-			tickInterval = (int) maxPrice/35;
-			xAxis = new NumberAxis(0, 35, 1);
-			yAxis = new NumberAxis(0, maxPrice * 1.2 , tickInterval);        
-	        sc = new
-				ScatterChart<Number,Number>(xAxis,yAxis);
-	        xAxis.setLabel("Days since " + LocalDate.now().toString());                
-	        yAxis.setLabel("Price");
-	        sc.setTitle(currentStock);
-	        series1 = new XYChart.Series();
-	        series2 = new XYChart.Series();
-	        ArrayList<Double> lastPrices = new ArrayList<>();
-	        File prevFile = new File("bin/symbols/" + currentStock + "prev.txt");
-	        Scanner prevFileScanner = new Scanner(prevFile);
-	        while(prevFileScanner.hasNext()) {
-	        	Double price = Double.parseDouble(prevFileScanner.nextLine());
-	        	lastPrices.add(price);
-	        }
-	        for(int i = 0;i<lastPrices.size();i++) {
-	        	series1.getData().add(new XYChart.Data(i+1,lastPrices.get(i)));
-	        }
-	        
-	        ArrayList<Double> nextPrices = new ArrayList<>();
-	        File nextFile = new File("bin/symbols/" + currentStock + ".txt");
-	        Scanner nextFileScanner = new Scanner(nextFile);
-	        while(nextFileScanner.hasNext()) {
-	        	double price = Double.parseDouble(nextFileScanner.nextLine());
-				price = Double.parseDouble(new DecimalFormat("##.##").format(price));
-				nextPrices.add(price);
-	        }
-	        
-	        for(int i = 0;i<nextPrices.size();i++) {
-	        	series2.getData().add(new XYChart.Data(i+23,nextPrices.get(i)));
-	        }
-	        
-		       sc.setLayoutX(W*0.231);
-		       sc.setLayoutY(H*0.1);
-		       sc.setPrefWidth(W*0.4);
-		       sc.setPrefHeight(H*0.4);
-		       sc.getData().add(series1);
-		       sc.getData().add(series2);
-		       sc.setTitle(chartTitle);
-		       homeGroup.getChildren().add(sc);
-	        }
-
-		VBox quotas = new VBox();
-		quotas.setSpacing(15);
-		quotas.setLayoutX(W*0.275);
-		quotas.setLayoutY(H*0.45);
-
-		if(StockPortfolio.symbols.size()>0) {
-			quotasLabel = new Label("Predicted Prices");
-			quotasLabel.setFont(Font.font("Georgia",FontWeight.BOLD,25));
-			quotasLabel.setTextFill(TEXT_COLOR);
-			quotas.getChildren().add(quotasLabel);
-			String currentStock = StockPortfolio.symbols.get(currentIndex);
-			try {
-				LocalDate today = LocalDate.now();
-				File nextFile = new File("bin/symbols/" + currentStock + ".txt");
-				Scanner nextFileScanner = new Scanner(nextFile);
-				ArrayList<Double> nextPrices = new ArrayList<>();
-				while(nextFileScanner.hasNext()) {
-					double price = Double.parseDouble(nextFileScanner.nextLine());
-					price = Double.parseDouble(new DecimalFormat("##.##").format(price));
-					nextPrices.add(price);
-				}
-				
-				for(int i = 0;i<nextPrices.size();i++) {
-					String nextDate = today.plusDays(i+1).toString();
-					String price = Double.toString(nextPrices.get(i));
-					Label currentLabel = new Label(nextDate + " : " + price);
-					currentLabel.setFont(Font.font("Georgia",20));
-					currentLabel.setTextFill(TEXT_COLOR);
-					quotas.getChildren().add(currentLabel);
-				}
-			} catch (IOException e1) {
-				e1.printStackTrace();
-			}
-		}
-				
+		quickAnalyzeButton.setOnMouseEntered(e-> {
+			quickAnalyzeButton.setStyle("-fx-background-color: rgb(0,140,204);");
+		});
+		
+		quickAnalyzeButton.setOnMouseExited(e-> {
+			quickAnalyzeButton.setStyle("-fx-background-color: rgb(0,168,204);");
+		});
+		
+		quickAnalyzeButton.setOnAction(e-> {
+			primaryStage.setScene(quickAnalyzeScene);
+			primaryStage.setFullScreen(true);
+		});
+		
 		Button next = new Button("Next");
 		next.setLayoutX(W*0.5);
 		next.setLayoutY(H*0.05);
@@ -611,59 +749,66 @@ public class Main extends Application  {
 		});
 		
 		next.setOnAction(e-> {
-			
-			if(currentIndex+1 == StockPortfolio.symbols.size()) {
-				System.out.println("");
-			}
-			
-			if(currentIndex+1 != StockPortfolio.symbols.size()) {
-				xAxis.setAutoRanging(true);
-				yAxis.setAutoRanging(true);
+			if(currentIndex+1 >= StockPortfolio.symbols.size()) {
+				System.out.println();
+			} else {
 				quotas.getChildren().clear();
+				quotasLabel = new Label("Predicted Prices");
+				quotasLabel.setFont(Font.font("Georgia",FontWeight.BOLD,25));
+				quotasLabel.setTextFill(TEXT_COLOR);
+				quotas.getChildren().add(quotasLabel);
+				currentIndex++;
 				series1.getData().clear();
 				sc.getData().clear();
-				currentIndex++;
-				String currentStock = StockPortfolio.symbols.get(currentIndex);
-				String companyName;
-				try {
-					maxPrice = Stock.getMaxPrice(6, currentStock);
-				} catch (IOException e3) {
-					e3.printStackTrace();
-				}
-
-				try {
-					companyName = StockReader.getCompanyName(currentStock);
-					chartTitle = currentStock + "(" + companyName + ")";
-				} catch (IOException e2) {
-					e2.printStackTrace();
-				}
-				File prevFile = new File("bin/symbols/" + currentStock + "prev.txt");
-				Scanner prevFileScanner;
-				try {
-					prevFileScanner = new Scanner(prevFile);
-					ArrayList<Double> prices = new ArrayList<>();
-					while(prevFileScanner.hasNext()) {
-						double price = Double.parseDouble(prevFileScanner.nextLine());
-						prices.add(price);
-					}
-					for(int j = 0;j<prices.size();j++) {
-						series1.getData().add(new XYChart.Data(j+1,prices.get(j)));
+				sc.setVisible(false);			
+				if(StockPortfolio.symbols.size() > 0) {
+					series1.getData().clear();
+					String currentStock = StockPortfolio.symbols.get(currentIndex);
+					try {
+						chartTitle = currentStock + "(" + StockReader.getCompanyName(currentStock) + ")" + " Previous Prices";
+						sc.setTitle(chartTitle);
+					} catch (IOException e2) {
+						e2.printStackTrace();
+					} catch (JSONException e1) {
+						// TODO Auto-generated catch block
+						e1.printStackTrace();
 					}
 					
-					quotasLabel = new Label("Predicted Prices:");
-					quotasLabel.setFont(Font.font("Georgia",FontWeight.BOLD,25));
-					quotasLabel.setTextFill(TEXT_COLOR);
-					quotas.getChildren().add(quotasLabel);
-					File nextFile = new File("bin/symbols/" + currentStock+ ".txt" );
-					Scanner nextFileScanner = new Scanner(nextFile);
+					File prevFile = new File("bin/symbols/" + currentStock + "prev.txt");
+					try {
+						ArrayList<Double> prevPrices = new ArrayList<>();
+						Scanner prevFileScanner = new Scanner(prevFile);
+						while(prevFileScanner.hasNext()) {
+							String currentLine = prevFileScanner.next();
+							double currentPrice = Double.parseDouble(currentLine);
+							prevPrices.add(currentPrice);
+						}
+						for(int i = 0;i<prevPrices.size();i++) {
+							double day = i+1;
+							double price = prevPrices.get(i);
+							series1.getData().add(new XYChart.Data(day,price));
+						}
+						sc.getData().add(series1);
+						sc.setVisible(true);
+					} catch (FileNotFoundException e1) {
+						e1.printStackTrace();
+					}
 					ArrayList<Double> nextPrices = new ArrayList<>();
+					File nextFile = new File("bin/symbols/" + currentStock +".txt");
+					Scanner nextFileScanner = null;
+					try {
+						nextFileScanner = new Scanner(nextFile);
+					} catch (FileNotFoundException e1) {
+						// TODO Auto-generated catch block
+						e1.printStackTrace();
+					}
 					while(nextFileScanner.hasNext()) {
 						double price = Double.parseDouble(nextFileScanner.nextLine());
 						price = Double.parseDouble(new DecimalFormat("##.##").format(price));
 						nextPrices.add(price);
 					}
 						LocalDate today = LocalDate.now();
-						for(int i = 0;i<nextPrices.size();i++) {
+					for(int i = 0;i<nextPrices.size();i++) {
 						String nextDate = today.plusDays(i+1).toString();
 						String price = Double.toString(nextPrices.get(i));
 						Label currentLabel = new Label(nextDate + " : " + price);
@@ -671,12 +816,8 @@ public class Main extends Application  {
 						currentLabel.setTextFill(TEXT_COLOR);
 						quotas.getChildren().add(currentLabel);
 					}
-				} catch (FileNotFoundException e1) {
-					e1.printStackTrace();
 				}
 			}
-			sc.getData().add(series1);
-			sc.setTitle(chartTitle);
 		});
 			
 		Button previous = new Button("Previous");
@@ -698,81 +839,252 @@ public class Main extends Application  {
 		});
 		
 		previous.setOnAction(e-> {
-			
 			if(currentIndex-1 < 0) {
-				System.out.println("");
-			}
-			
-			if(currentIndex-1 >= 0) {
+				System.out.println();
+			} else {
 				quotas.getChildren().clear();
+				quotasLabel = new Label("Predicted Prices");
+				quotasLabel.setFont(Font.font("Georgia",FontWeight.BOLD,25));
+				quotasLabel.setTextFill(TEXT_COLOR);
+				quotas.getChildren().add(quotasLabel);
+				currentIndex--;
 				series1.getData().clear();
 				sc.getData().clear();
-				currentIndex--;
+				sc.setVisible(false);			
+				if(StockPortfolio.symbols.size() > 0) {
+					series1.getData().clear();
+					String currentStock = StockPortfolio.symbols.get(currentIndex);
+					try {
+						try {
+							chartTitle = currentStock + "(" + StockReader.getCompanyName(currentStock) + ")";
+						} catch (JSONException e1) {
+							// TODO Auto-generated catch block
+							e1.printStackTrace();
+						}
+						sc.setTitle(chartTitle);
+					} catch (IOException e2) {
+						e2.printStackTrace();
+					}
+					
+					File prevFile = new File("bin/symbols/" + currentStock + "prev.txt");
+					try {
+						ArrayList<Double> prevPrices = new ArrayList<>();
+						Scanner prevFileScanner = new Scanner(prevFile);
+						while(prevFileScanner.hasNext()) {
+							String currentLine = prevFileScanner.next();
+							double currentPrice = Double.parseDouble(currentLine);
+							prevPrices.add(currentPrice);
+						}
+						for(int i = 0;i<prevPrices.size();i++) {
+							double day = i+1;
+							double price = prevPrices.get(i);
+							series1.getData().add(new XYChart.Data(day,price));
+						}
+						sc.getData().add(series1);
+						sc.setVisible(true);
+					} catch (FileNotFoundException e1) {
+						e1.printStackTrace();
+					}
+					ArrayList<Double> nextPrices = new ArrayList<>();
+					File nextFile = new File("bin/symbols/" + currentStock +".txt");
+					Scanner nextFileScanner = null;
+					try {
+						nextFileScanner = new Scanner(nextFile);
+					} catch (FileNotFoundException e1) {
+						// TODO Auto-generated catch block
+						e1.printStackTrace();
+					}
+					while(nextFileScanner.hasNext()) {
+						double price = Double.parseDouble(nextFileScanner.nextLine());
+						price = Double.parseDouble(new DecimalFormat("##.##").format(price));
+						nextPrices.add(price);
+					}
+						LocalDate today = LocalDate.now();
+					for(int i = 0;i<nextPrices.size();i++) {
+						String nextDate = today.plusDays(i+1).toString();
+						String price = Double.toString(nextPrices.get(i));
+						Label currentLabel = new Label(nextDate + " : " + price);
+						currentLabel.setFont(Font.font("Georgia",20));
+						currentLabel.setTextFill(TEXT_COLOR);
+						quotas.getChildren().add(currentLabel);
+					}
+				}
+			}
+		});
+		
+		if(StockPortfolio.symbols.size()>0) {
+			
+			ArrayList<String> symbolsClone = new ArrayList<>();
+			for(int i = 0;i<StockPortfolio.symbols.size();i++) {
+				String currentStock = StockPortfolio.symbols.get(i);
+				symbolsClone.add(StockPortfolio.symbols.get(i));
+				File currentPrevFile = new File("bin/symbols/" + currentStock + "prev.txt");
+				File currentNextFile = new File("bin/symbols/" + currentStock + ".txt");
+				currentPrevFile.delete();
+				currentNextFile.delete();
+			}
+			StockPortfolio.symbols.clear();
+			for(int i = 0;i<symbolsClone.size();i++) {
+				Thread.sleep(100);
+				StockPortfolio.addStock(symbolsClone.get(i));
+			}
+			
+			emptyImageView.setVisible(false);
+			sc.getData().clear();
+			sc.setVisible(false);
+			if(StockPortfolio.symbols.size() > 0) {
+				series1.getData().clear();
 				String currentStock = StockPortfolio.symbols.get(currentIndex);
-				try {
-					maxPrice = Stock.getMaxPrice(6, currentStock);
-				} catch (IOException e3) {
-					e3.printStackTrace();
-				}
-				try {
-					String companyName = StockReader.getCompanyName(currentStock);
-					chartTitle = currentStock + "(" + companyName + ")";
-				} catch (IOException e2) {
-					e2.printStackTrace();
-				}
-				
-				sc.setTitle(currentStock);
+				chartTitle = currentStock + "(" + StockReader.getCompanyName(currentStock) + ")" + " Previous Prices";
+				sc.setTitle(chartTitle);
 				File prevFile = new File("bin/symbols/" + currentStock + "prev.txt");
-				Scanner prevFileScanner;
 				try {
-					prevFileScanner = new Scanner(prevFile);
-					ArrayList<Double> prices = new ArrayList<>();
+					ArrayList<Double> prevPrices = new ArrayList<>();
+					Scanner prevFileScanner = new Scanner(prevFile);
+					
 					while(prevFileScanner.hasNext()) {
-						double price = Double.parseDouble(prevFileScanner.nextLine());
-						prices.add(price);
+						String currentLine = prevFileScanner.next();
+						double currentPrice = Double.parseDouble(currentLine);
+						prevPrices.add(currentPrice);
 					}
-					for(int j = 0;j<prices.size();j++) {
-						series1.getData().add(new XYChart.Data(j+1,prices.get(j)));
-						
-						quotasLabel = new Label("Predicted Prices:");
-						quotasLabel.setFont(Font.font("Georgia",FontWeight.BOLD,25));
-						quotasLabel.setTextFill(TEXT_COLOR);
-						quotas.getChildren().add(quotasLabel);
-						File nextFile = new File("bin/symbols/" + currentStock+ ".txt" );
-						Scanner nextFileScanner = new Scanner(nextFile);
-						ArrayList<Double> nextPrices = new ArrayList<>();
-						while(nextFileScanner.hasNext()) {
-							double price = Double.parseDouble(nextFileScanner.nextLine());
-							price = Double.parseDouble(new DecimalFormat("##.##").format(price));
-							nextPrices.add(price);
-						}
-							LocalDate today = LocalDate.now();
-							for(int i = 0;i<nextPrices.size();i++) {
-							String nextDate = today.plusDays(i+1).toString();
-							String price = Double.toString(nextPrices.get(i));
-							Label currentLabel = new Label(nextDate + " : " + price);
-							currentLabel.setFont(Font.font("Georgia",20));
-							currentLabel.setTextFill(TEXT_COLOR);
-							quotas.getChildren().add(currentLabel);
-						}
+					for(int i = 0;i<prevPrices.size();i++) {
+						double day = i+1;
+						double price = prevPrices.get(i);
+						series1.getData().add(new XYChart.Data(day,price));
 					}
+					sc.getData().add(series1);
 				} catch (FileNotFoundException e1) {
 					e1.printStackTrace();
 				}
+				
+				ArrayList<Double> nextPrices = new ArrayList<>();
+				File nextFile = new File("bin/symbols/" + currentStock +".txt");
+				Scanner nextFileScanner = new Scanner(nextFile);
+				while(nextFileScanner.hasNext()) {
+					double price = Double.parseDouble(nextFileScanner.nextLine());
+					price = Double.parseDouble(new DecimalFormat("##.##").format(price));
+					nextPrices.add(price);
+				}
+					LocalDate today = LocalDate.now();
+				for(int i = 0;i<nextPrices.size();i++) {
+					String nextDate = today.plusDays(i+1).toString();
+					String price = Double.toString(nextPrices.get(i));
+					Label currentLabel = new Label(nextDate + " : " + price);
+					currentLabel.setFont(Font.font("Georgia",20));
+					currentLabel.setTextFill(TEXT_COLOR);
+					quotas.getChildren().add(currentLabel);
+				}
+				quotas.setVisible(true);
+				sc.setVisible(true);
 			}
-			sc.getData().add(series1);
-			sc.setTitle(chartTitle);
+		} else {
+			next.setVisible(false);
+			quotas.setVisible(false);
+			previous.setVisible(false);
+			sc.setVisible(false);
+			emptyImageView.setVisible(true);
+		}
+		
+		homeButton.setOnAction(e-> {
+			sc.setVisible(false);
+			if(StockPortfolio.symbols.size() > 0) {
+				next.setVisible(true);
+				previous.setVisible(true);
+				emptyImageView.setVisible(false);
+				quotas.getChildren().clear();
+				quotasLabel = new Label("Predicted Prices");
+				quotasLabel.setFont(Font.font("Georgia",FontWeight.BOLD,25));
+				quotasLabel.setTextFill(TEXT_COLOR);
+				quotas.getChildren().add(quotasLabel);
+				series1.getData().clear();
+				currentIndex = 0;
+				String firstStock = StockPortfolio.symbols.get(0);
+				try {
+					chartTitle = firstStock + "(" + StockReader.getCompanyName(firstStock) + ")" + " Previous Prices";
+				} catch (IOException | JSONException e2) {
+					e2.printStackTrace();
+				}
+				File prevFile = new File("bin/symbols/" + firstStock + "prev.txt");
+				try {
+					ArrayList<Double> prevPrices = new ArrayList<>();
+					Scanner prevFileScanner = new Scanner(prevFile);
+					while(prevFileScanner.hasNext()) {
+						String currentLine = prevFileScanner.next();
+						double currentPrice = Double.parseDouble(currentLine);
+						prevPrices.add(currentPrice);
+					}
+					for(int i = 0;i<prevPrices.size();i++) {
+						double day = i+1;
+						double price = prevPrices.get(i);
+						series1.getData().add(new XYChart.Data(day,price));
+					}
+					sc.setTitle(chartTitle);
+					sc.getData().add(series1);
+					sc.setVisible(true);
+				} catch (FileNotFoundException e1) {
+					e1.printStackTrace();
+				}
+				ArrayList<Double> nextPrices = new ArrayList<>();
+				File nextFile = new File("bin/symbols/" + firstStock +".txt");
+				Scanner nextFileScanner = null;
+				try {
+					nextFileScanner = new Scanner(nextFile);
+				} catch (FileNotFoundException e1) {
+				}
+				while(nextFileScanner.hasNext()) {
+					double price = Double.parseDouble(nextFileScanner.nextLine());
+					price = Double.parseDouble(new DecimalFormat("##.##").format(price));
+					nextPrices.add(price);
+				}
+				
+					LocalDate today = LocalDate.now();
+				for(int i = 0;i<nextPrices.size();i++) {
+					String nextDate = today.plusDays(i+1).toString();
+					String price = Double.toString(nextPrices.get(i));
+					Label currentLabel = new Label(nextDate + " : " + price);
+					currentLabel.setFont(Font.font("Georgia",20));
+					currentLabel.setTextFill(TEXT_COLOR);
+					quotas.getChildren().add(currentLabel);
+				}
+				quotas.setVisible(true);
+			} else {
+				emptyImageView.setVisible(true);
+				next.setVisible(false);
+				previous.setVisible(false);
+				quotas.setVisible(false);
+			}
+			
+			primaryStage.setScene(homeScene);
+			primaryStage.setFullScreen(true);
 		});
 		
-		homeGroup.getChildren().addAll(menuRectangle,epb,help,info,next,previous,quotas,logoImageView);
-		
+		Image exitIcon = new Image("exitIcon.png");
+		ImageView exitIconView = new ImageView(exitIcon);
+		exitIconView.setLayoutX(W*0.625);
+		exitIconView.setLayoutY(H*0.01);
+		Button exitButton = new Button("",exitIconView);
+		exitButton.setPrefWidth(0);
+		exitButton.setPrefHeight(0);
+		exitButton.setLayoutX(W*0.625);
+		exitButton.setLayoutY(H*0.01);
+		exitButton.setOnAction(e-> {
+			primaryStage.close();
+		});
+			
+		homeGroup.getChildren().addAll(menuRectangle,epb,help,info,next,previous,logoImageView,emptyImageView,quotas,
+				quickAnalyzeButton,exitButton);
+
 		primaryStage.setScene(homeScene);
 		primaryStage.setFullScreen(true);
 		
 		primaryStage.setOnCloseRequest(e-> {
-			StockPortfolio.save();
+			try {
+				StockPortfolio.save();
+			} catch (IOException e1) {
+				// TODO Auto-generated catch block
+				e1.printStackTrace();
+			}
 		});
-		
 		primaryStage.show();
 	}
 		 
@@ -780,4 +1092,5 @@ public class Main extends Application  {
 		launch(args);
     	}
 	}
+
 
