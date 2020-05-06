@@ -222,10 +222,5 @@ public class MultipleDimensionalHypothesisFunction {
 		}
 		return result;
 	}
-	
-	public static void main(String[] args) throws IOException, JSONException {
-		ArrayList<double[][]> inputMatrices = StockReader.getAllInfo("AAPL");
-		double[][] lastPrices = Stock.getLastPricesFor("AAPL");		
-	}
 }
 
