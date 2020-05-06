@@ -2,6 +2,7 @@
 
 
 
+
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.FileReader;
@@ -21,6 +22,8 @@ import org.json.JSONException;
 import org.json.JSONObject;
 
 public class StockReader {
+	
+		public static final String[] infoList = {"low","high","open","volume"};
 	
 		public static String getURLString(String symbol) {
 			return "https://sandbox.iexapis.com/stable/stock/" + symbol + "/batch?types=quote,news,chart&range=1m&last=10&token=Tsk_db4493dc79614614a66ce7b5b62201d2";
@@ -57,7 +60,37 @@ public class StockReader {
 				prices[i][0] = currentObject.getDouble("close");
 			}
 			return prices;
-		}	
+		}
+	
+	public static double[][] getInfoAbout(String stockName, String info) throws IOException, JSONException {
+		String jsonString = getJsonString(stockName);
+		JSONArray chart = getJSONArray(stockName);
+		double[][] infoList = new double[chart.length()][1];
+		for(int i = 0;i<chart.length();i++) {
+			JSONObject currentObject = chart.getJSONObject(i);
+				infoList[i][0] = currentObject.getDouble(info);
+			}
+			return infoList;
+		}
+	
+	public static ArrayList<double[][]> getAllInfo(String stockName) throws IOException, JSONException {
+		ArrayList<double[][]> allInfo = new ArrayList<>();
+		String jsonString = getJsonString(stockName);
+		JSONArray chart = getJSONArray(stockName);
+		for(int i = 0;i<infoList.length;i++) {
+			double[][] currentList = new double[chart.length()][1];
+			String currentInfoNeeded = infoList[i];
+			for(int j = 0;j<chart.length();j++) {
+				JSONObject currentObject = chart.getJSONObject(j);
+				double currentInfo = currentObject.getDouble(currentInfoNeeded);
+				currentList[j][0] = currentInfo;
+			}
+			allInfo.add(currentList);
+			currentList = new double[chart.length()][1];
+		}
+		return allInfo;
+	}
+			
 	public static double getMaxPrice(String stockName) throws IOException, JSONException {
 			double[][] prices = getPrices(stockName);
 		double max = prices[0][0];
