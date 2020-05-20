@@ -59,6 +59,8 @@ public class HypothesisFunction {
 					designMatrix[i][j] = elements[assigningIndex];
 					assigningIndex++;
 				}
+			}
+		}
 		int assigningIndex = 0;
 		for (int i = 0; i < designMatrix.length; i++) {
 			for (int j = 0; j < designMatrix[i].length; j++) {
